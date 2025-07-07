@@ -9,14 +9,14 @@ var SMALL_FONT = "16px Helvetica, Arial, sans-serif";
 var SMALL_TEXT_COLOR = "#fff";
 var SMALL_TEXT_Y_OFFSET = 18; // px gap from box to small text
 var SMALL_TEXT_HEIGHT = 18; // estimate for vertical centering
-// Physics constants
-var GRAVITY = 0.5;
-var JUMP_VELOCITY = -12;
-var MOVE_SPEED = 5;
-var FRICTION = 0.8;
+// Physics constants - adjusted to match original feel but time-based
+var GRAVITY = 1500; // Increased for more natural falling
+var JUMP_VELOCITY = -600; // Adjusted for higher gravity
+var MOVE_SPEED = 250; // Back to original value for snappier movement
+var FRICTION = 5; // Time-based friction factor
 var BOUNCE_FACTOR = 0.4; // How much to bounce when landing
 var SQUASH_FACTOR = 0.85; // How much to squash when landing
-var RECOVERY_SPEED = 0.15; // How fast to recover from squashing
+var RECOVERY_SPEED = 8; // How fast to recover from squashing
 // Platform constants
 var PLATFORM_HEIGHT = 10;
 var PLATFORM_WIDTH = 80; // Fixed short width for all platforms
@@ -325,7 +325,7 @@ function checkPlatformCollisions() {
                 player.x >= platform.x && // Horizontally aligned with the platform
                 player.x <= platform.x + platform.width) {
                 // Apply bounce effect
-                if (player.vy > 3) { // Only bounce if falling fast enough
+                if (player.vy > 150) { // Adjusted bounce threshold for higher gravity
                     player.vy = -player.vy * BOUNCE_FACTOR;
                     // Apply squashing effect
                     squashStretch = SQUASH_FACTOR;
@@ -345,7 +345,7 @@ function checkPlatformCollisions() {
 function updatePlayer(deltaTime) {
     var boxX = getBoxX();
     var boxY = getBoxY();
-    // Handle horizontal movement
+    // Handle horizontal movement with delta time
     if (keyLeft && !keyRight) {
         player.vx = -MOVE_SPEED;
     }
@@ -353,13 +353,14 @@ function updatePlayer(deltaTime) {
         player.vx = MOVE_SPEED;
     }
     else {
-        player.vx *= FRICTION;
-        if (Math.abs(player.vx) < 0.1)
+        // Apply friction based on delta time
+        player.vx *= Math.pow(0.5, deltaTime * FRICTION);
+        if (Math.abs(player.vx) < 1)
             player.vx = 0;
     }
     // Only apply gravity after the first jump
     if (firstJump) {
-        player.vy += GRAVITY;
+        player.vy += GRAVITY * deltaTime;
     }
     // Handle jumping - only allow jumping when not already jumping
     if (keyUp && !player.isJumping) {
@@ -370,20 +371,20 @@ function updatePlayer(deltaTime) {
         squashStretch = 1 / SQUASH_FACTOR;
         player.landingTime = performance.now();
     }
-    // Update squash and stretch animation
+    // Update squash and stretch animation using delta time
     if (squashStretch !== 1.0) {
         var targetStretch = 1.0;
-        squashStretch += (targetStretch - squashStretch) * RECOVERY_SPEED;
+        squashStretch += (targetStretch - squashStretch) * RECOVERY_SPEED * deltaTime;
         // Reset when close enough to normal
         if (Math.abs(squashStretch - 1.0) < 0.01) {
             squashStretch = 1.0;
         }
     }
-    // Update position
-    player.x += player.vx;
+    // Update position with delta time
+    player.x += player.vx * deltaTime;
     // Only update Y position if we've started jumping
     if (firstJump) {
-        player.y += player.vy;
+        player.y += player.vy * deltaTime;
     }
     // Check if player has exited the box for the first time
     if (!hasExitedBox && !player.isInsideBox) {
@@ -412,8 +413,8 @@ function updatePlayer(deltaTime) {
         }
         else if (player.y + player.height / 2 > boxY + BOX_HEIGHT - NAME_PADDING) {
             player.y = boxY + BOX_HEIGHT - NAME_PADDING - player.height / 2;
-            // Apply bounce effect
-            if (player.vy > 3) { // Only bounce if falling fast enough
+            // Apply bounce effect (with adjusted threshold)
+            if (player.vy > 150) {
                 player.vy = -player.vy * BOUNCE_FACTOR;
                 // Apply squashing effect
                 squashStretch = SQUASH_FACTOR;
@@ -434,6 +435,12 @@ function updatePlayer(deltaTime) {
     }
     else {
         // Player is outside the box
+        // Enforce screen boundaries
+        // Top of screen (prevent escaping through top)
+        if (player.y - player.height / 2 < 0) {
+            player.y = player.height / 2;
+            player.vy = 0; // Stop upward velocity
+        }
         // Left edge of screen with bounce
         if (player.x - player.width / 2 < 0) {
             player.x = player.width / 2;
@@ -451,8 +458,8 @@ function updatePlayer(deltaTime) {
             player.x >= boxX && // Horizontally aligned with the box
             player.x <= boxX + BOX_WIDTH) {
             player.y = boxY - player.height / 2;
-            // Apply bounce effect
-            if (player.vy > 3) { // Only bounce if falling fast enough
+            // Apply bounce effect (with adjusted threshold)
+            if (player.vy > 150) {
                 player.vy = -player.vy * BOUNCE_FACTOR;
                 // Apply squashing effect
                 squashStretch = SQUASH_FACTOR;
@@ -471,7 +478,7 @@ function updatePlayer(deltaTime) {
         if (player.y + player.height / 2 > CANVAS_HEIGHT) {
             player.y = CANVAS_HEIGHT - player.height / 2;
             // Apply bounce effect
-            if (player.vy > 3) {
+            if (player.vy > 150) {
                 player.vy = -player.vy * BOUNCE_FACTOR;
                 // Apply squashing effect
                 squashStretch = SQUASH_FACTOR;
@@ -485,11 +492,13 @@ function updatePlayer(deltaTime) {
     }
 }
 function updateGame(currentTime) {
-    // Calculate delta time
-    var deltaTime = lastFrameTime ? (currentTime - lastFrameTime) / 1000 : 0;
+    // Calculate delta time (in seconds)
+    var deltaTime = lastFrameTime ? (currentTime - lastFrameTime) / 1000 : 0.016; // Default to 60fps on first frame
+    // Cap delta time to avoid huge jumps if tab is inactive
+    var cappedDeltaTime = Math.min(deltaTime, 0.1);
     lastFrameTime = currentTime;
     if (playerActivated) {
-        updatePlayer(deltaTime);
+        updatePlayer(cappedDeltaTime);
     }
     else if (keyLeft || keyRight || keyUp) {
         // Player has pressed a key for the first time
@@ -511,7 +520,7 @@ function gameLoop(timestamp) {
 function handleKeyDown(e) {
     if (e.key === "ArrowLeft" || e.key === "a")
         keyLeft = true;
-    if (e.key === "ArrowRight" || e.key === "s")
+    if (e.key === "ArrowRight" || e.key === "d")
         keyRight = true;
     if (e.key === "ArrowUp" || e.key === "w")
         keyUp = true;
@@ -525,7 +534,7 @@ function handleKeyDown(e) {
 function handleKeyUp(e) {
     if (e.key === "ArrowLeft" || e.key === "a")
         keyLeft = false;
-    if (e.key === "ArrowRight" || e.key === "s")
+    if (e.key === "ArrowRight" || e.key === "d")
         keyRight = false;
     if (e.key === "ArrowUp" || e.key === "w")
         keyUp = false;
