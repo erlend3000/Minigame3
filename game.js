@@ -12,8 +12,8 @@ var SMALL_TEXT_HEIGHT = 18; // estimate for vertical centering
 // Physics constants - adjusted to match original feel but time-based
 var GRAVITY = 1500; // Increased for more natural falling
 var JUMP_VELOCITY = -600; // Adjusted for higher gravity
-var MOVE_SPEED = 250; // Back to original value for snappier movement
-var FRICTION = 5; // Time-based friction factor
+var MOVE_SPEED = 200; // Back to original value for snappier movement
+var FRICTION = 6; // Time-based friction factor
 var BOUNCE_FACTOR = 0.4; // How much to bounce when landing
 var SQUASH_FACTOR = 0.85; // How much to squash when landing
 var RECOVERY_SPEED = 8; // How fast to recover from squashing
